@@ -7,123 +7,109 @@
 
 #include "readyqueue.h"
 
-void print_list(node_t *head)
-{
-    node_t *current = head;
+#include <stdio.h>
+#include <sys/time.h>
+#include <string.h>
+#include <stdlib.h>
+#include <pthread.h>
 
-    while (current != NULL)
+pthread_mutex_t rq_lock;
+
+// initialises the ready queue
+struct readyqueue *initReadyQueue()
+{
+    struct readyqueue *rq = malloc(sizeof(struct readyqueue));
+    rq->head = NULL;
+    rq->tail = NULL;
+    if (pthread_mutex_init(&rq_lock, NULL) != 0)
     {
-        printf("%d\n", current->val);
-        current = current->next;
+        printf("ERROR: mutex lock can't initialise readyqueue!\n");
+        return NULL;
     }
+    return rq;
 }
 
-int pop(node_t **head)
+// initialises a burst node
+struct burst *createBurst(int thread_id, int burst_id, int length)
 {
-    int retval = -1;
-    node_t *next_node = NULL;
-
-    if (*head == NULL)
-    {
-        return -1;
-    }
-
-    next_node = (*head)->next;
-    retval = (*head)->val;
-    free(*head);
-    *head = next_node;
-
-    return retval;
+    struct burst *node = malloc(sizeof(struct burst));
+    node->thread_id = thread_id;
+    node->burst_id = burst_id;
+    node->length = length;
+    node->next = NULL;
+    return node;
 }
 
-int remove_last(node_t *head)
+/* Pushes a CPU burst to the readyqueue
+** Uses mutex locker to block concurrent access to the critical section
+*/
+void pushBurst(struct readyqueue *rq, int thread_id, int burst_id, int length)
 {
-    int retval = 0;
-    /* if there is only one item in the list, remove it */
+    pthread_mutex_lock(&rq_lock);
+    struct timeval time;
+    struct burst *node = createBurst(thread_id, burst_id, length);
+    if (rq->head != NULL) // readyqueue is not empty
+    {
+        rq->tail->next = node;
+        rq->tail = rq->tail->next;
+    }
+    else
+    {
+        rq->head = node;
+        rq->tail = rq->head;
+    }
+    gettimeofday(&time, NULL);
+    rq->tail->time = time;
+    pthread_mutex_unlock(&rq_lock);
+}
+
+// pops a cpu burst out of the readyqueue
+struct burst *popBurst(struct burst *head)
+{
+    struct burst *node = createBurst(-1, -1, -1); // create a node with default values
+
     if (head->next == NULL)
     {
-        retval = head->val;
+        node->thread_id = head->thread_id;
+        node->burst_id = head->burst_id;
+        node->length = head->length;
         free(head);
-        return retval;
+        return node;
     }
 
     /* get to the second to last node in the list */
-    node_t *current = head;
+    struct burst *current = head;
     while (current->next->next != NULL)
     {
         current = current->next;
     }
 
     /* now current points to the second to last item of the list, so let's remove current->next */
-    retval = current->next->val;
+    node->thread_id = current->next->thread_id;
+    node->burst_id = current->next->burst_id;
+    node->length = current->next->length;
     free(current->next);
     current->next = NULL;
-    return retval;
+    return node;
 }
 
-int remove_by_index(node_t **head, int n)
+// prints content of the readyqueue
+void printReadyqueue(burst *head)
 {
-    int i = 0;
-    int retval = -1;
-    node_t *current = *head;
-    node_t *temp_node = NULL;
+    burst *node = head;
 
-    if (n == 0)
+    while (node != NULL)
     {
-        return pop(head);
+        printf("burst id: %d\n", node->burst_id);
+        node = node->next;
     }
-
-    for (i = 0; i < n - 1; i++)
-    {
-        if (current->next == NULL)
-        {
-            return -1;
-        }
-        current = current->next;
-    }
-
-    temp_node = current->next;
-    retval = temp_node->val;
-    current->next = temp_node->next;
-    free(temp_node);
-
-    return retval;
 }
 
-int remove_by_value(node_t **head, int val)
+// deletes the readyqueue by deallocation
+void deleteReadyqueue(struct burst *head)
 {
-    node_t *previous, *current;
-
-    if (*head == NULL)
-    {
-        return -1;
-    }
-
-    if ((*head)->val == val)
-    {
-        return pop(head);
-    }
-
-    previous = current = (*head)->next;
-    while (current)
-    {
-        if (current->val == val)
-        {
-            previous->next = current->next;
-            free(current);
-            return val;
-        }
-
-        previous = current;
-        current = current->next;
-    }
-    return -1;
-}
-
-void delete_list(node_t *head)
-{
-    node_t *current = head,
-           *next = head;
+    struct burst *current = head,
+                 *next = head;
 
     while (current)
     {
@@ -131,14 +117,4 @@ void delete_list(node_t *head)
         free(current);
         current = next;
     }
-}
-
-void push(node_t **head, int val)
-{
-    node_t *new_node;
-    new_node = (node_t *)malloc(sizeof(node_t));
-
-    new_node->val = val;
-    new_node->next = *head;
-    *head = new_node;
 }

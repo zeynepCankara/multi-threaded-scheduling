@@ -2,27 +2,35 @@
 #ifndef READYQUEUE_H
 #define READYQUEUE_H
 
+#include <sys/time.h> // gettimeoftheday()
 #include <stdio.h>
 #include <stdlib.h>
+#include <pthread.h>
 
-typedef struct node
+typedef struct burst
 {
-    int val;
-    struct node *next;
-} node_t;
+    struct burst *next;
+    int thread_id;
+    int burst_id;
+    int length;
+    struct timeval time;
+} burst;
 
 typedef struct readyqueue
 {
-    struct node *head;
-    struct node *tail;
+    struct burst *head;
+    struct burst *tail;
 } readyqueue;
 
-void print_list(node_t *head);
-int pop(node_t **head);
-int remove_last(node_t *head);
-int remove_by_index(node_t **head, int n);
-int remove_by_value(node_t **head, int val);
-void delete_list(node_t *head);
-void push(node_t **head, int val);
+struct readyqueue *initReadyQueue();
+struct burst *createBurst(int thread_id, int burst_id, int length);
+void pushBurst(struct readyqueue *rq, int thread_id, int burst_id, int length);
+struct burst *FCFS(struct readyqueue *rq);
+struct burst *SJF(struct readyqueue *rq);
+
+// helpers
+void printReadyqueue(burst *head);
+struct burst *popBurst(struct burst *head);
+void deleteReadyqueue(struct burst *head);
 
 #endif

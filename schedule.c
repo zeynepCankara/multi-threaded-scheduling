@@ -105,21 +105,18 @@ int main(int argc, char *argv[])
     }
 
     // test the readyqueue
-    node_t *test_list = (node_t *)malloc(sizeof(node_t));
+    struct burst *test_rq = (burst *)malloc(sizeof(burst));
 
-    test_list->val = 1;
-    test_list->next = (node_t *)malloc(sizeof(node_t));
-    test_list->next->val = 2;
-    test_list->next->next = (node_t *)malloc(sizeof(node_t));
-    test_list->next->next->val = 3;
-    test_list->next->next->next = (node_t *)malloc(sizeof(node_t));
-    test_list->next->next->next->val = 4;
-    test_list->next->next->next->next = NULL;
-
-    remove_by_value(&test_list, 3);
-
-    print_list(test_list);
-    delete_list(test_list);
+    test_rq->burst_id = 1;
+    test_rq->next = (burst *)malloc(sizeof(burst));
+    test_rq->next->burst_id = 2;
+    test_rq->next->next = (struct burst *)malloc(sizeof(burst));
+    test_rq->next->next->burst_id = 3;
+    test_rq->next->next->next = (struct burst *)malloc(sizeof(burst));
+    test_rq->next->next->next->burst_id = 4;
+    test_rq->next->next->next->next = NULL;
+    printReadyqueue(test_rq);
+    deleteReadyqueue(test_rq);
 
     return 0;
 }
