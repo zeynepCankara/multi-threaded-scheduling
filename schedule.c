@@ -4,7 +4,7 @@
  * A server threads handles the scheduling and execution of the bursts.
  * @author Zeynep Cankara - 21703381
  * @version 1.0
- */
+ **/
 
 #include <errno.h>
 #include <stdio.h>
@@ -13,6 +13,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <string.h>
+#include "readyqueue.h"
 
 #define MAXTHREADS 20  /* max number of threads */
 #define MAXFILENAME 50 /* max length of a filename */
@@ -62,8 +63,10 @@ int main(int argc, char *argv[])
     int isFromFile = 0;
     int N;
     int Bcount;
-    int minB, avgB;
-    int minA, avgA;
+    int minB;
+    int avgB;
+    int minA;
+    int avgA;
     char *alg;
     char *inprefix;
     if (argc == 8)
@@ -100,6 +103,23 @@ int main(int argc, char *argv[])
         printf("read from file mode:$ schedule <N> <ALG> -f <inprefix>\n");
         return -1;
     }
+
+    // test the readyqueue
+    node_t *test_list = (node_t *)malloc(sizeof(node_t));
+
+    test_list->val = 1;
+    test_list->next = (node_t *)malloc(sizeof(node_t));
+    test_list->next->val = 2;
+    test_list->next->next = (node_t *)malloc(sizeof(node_t));
+    test_list->next->next->val = 3;
+    test_list->next->next->next = (node_t *)malloc(sizeof(node_t));
+    test_list->next->next->next->val = 4;
+    test_list->next->next->next->next = NULL;
+
+    remove_by_value(&test_list, 3);
+
+    print_list(test_list);
+    delete_list(test_list);
 
     return 0;
 }
