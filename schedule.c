@@ -22,7 +22,11 @@
 typedef struct argvThread
 {
     int t_index; // thread id
+    pthread_attr_t t_attr;
+    pthread_cond_t t_cond; // condition variable
 } argvThread;
+
+struct argvThread t_args[MAX_THREADS]; // pass the thread arguments
 
 static void *do_task(void *arg_ptr)
 {
@@ -165,17 +169,18 @@ int main(int argc, char *argv[])
     struct readyqueue *rq = initReadyQueue();
 
     // create the threads
-    pthread_t tids[MAX_THREADS];           // thread ids
-    struct argvThread t_args[MAX_THREADS]; /*thread function arguments*/
+    pthread_t tids[MAX_THREADS]; // thread ids
 
     int ret;
 
     for (int i = 0; i < N; ++i)
     {
         t_args[i].t_index = i;
+        pthread_attr_init(&t_args[i].t_attr);
+        t_args[i].t_cond = (pthread_cond_t)PTHREAD_COND_INITIALIZER;
 
         ret = pthread_create(&(tids[i]),
-                             NULL, do_task, (void *)&(t_args[i]));
+                             &t_args[i].t_attr, do_task, (void *)&(t_args[i]));
 
         if (ret != 0)
         {
@@ -198,7 +203,6 @@ int main(int argc, char *argv[])
     }
 
     printf("main: all threads terminated\n");
-    sjfTest(rq);
 
     return 0;
 }
