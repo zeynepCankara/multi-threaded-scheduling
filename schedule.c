@@ -13,10 +13,22 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <string.h>
-#include "readyqueue.h"
 #include <math.h>
 
+#include "readyqueue.h"
+
 #define MAX_THREADS 10 // maximum number of threads
+
+// global variables
+int N;
+int Bcount;
+int minB;
+int avgB;
+int minA;
+int avgA;
+char *alg;
+char *inprefix;
+struct readyqueue *rq;
 
 // argument list for the thread
 typedef struct argvThread
@@ -27,15 +39,30 @@ typedef struct argvThread
 } argvThread;
 
 struct argvThread t_args[MAX_THREADS]; // pass the thread arguments
+pthread_cond_t t_cond_wait = PTHREAD_COND_INITIALIZER;
 
 static void *do_task(void *arg_ptr)
 {
-    // init variables
+    int t_id = ((struct argvThread *)arg_ptr)->t_index;
+    pthread_mutex_t t_mutex = PTHREAD_MUTEX_INITIALIZER;
+    printf("thread %d started\n", t_id + 1);
 
-    printf("thread %d started\n", ((struct argvThread *)arg_ptr)->t_index);
+    // perform task...
+    for (int b_index = 0; b_index < Bcount; b_index++)
+    {
+        // Get Burst Duration
+        int burstTime = getBurstLength(NULL);
+        // Send burst duration to queue
+        pushBurst(rq, t_id, b_index, burstTime);
+        pthread_cond_signal(&t_cond_wait);
+        pthread_cond_wait(&(t_args[t_id].t_cond), &t_mutex); // wait cond mutex
+        // Get Sleep Duration
+        int sleepTime = getInterarrivalLength(NULL);
+        usleep(sleepTime * 1000); // in ms
+    }
 
-    // perform task
-
+    pushBurst(rq, t_id, Bcount, -1);
+    pthread_cond_signal(&t_cond_wait);
     pthread_exit(NULL);
 }
 
@@ -44,7 +71,7 @@ double generateRandomExpNum(int mean)
 {
     if (mean == 0)
     {
-        printf("ERROR: undefiened lambda param");
+        printf("ERROR: undefiened lambda parameter");
         exit(0);
     }
     double lambda = 1 / (double)(mean);
@@ -62,6 +89,36 @@ double getRandExpTime(int mean, int lowerLimit)
         randExpNum = generateRandomExpNum(mean);
     }
     return randExpNum;
+}
+
+int getBurstLength(FILE *fp)
+{
+    int length = 0;
+    if (fp == NULL)
+    {
+        length = getRandExpTime(avgB, minB);
+    }
+    else
+    {
+        // READ burst time from file and assign it to burstTime
+        fscanf(fp, "%*s %d", &length);
+    }
+    return length;
+}
+
+int getInterarrivalLength(FILE *fp)
+{
+    int length = 0;
+    if (fp == NULL)
+    {
+        length = getRandExpTime(avgA, minA);
+    }
+    else
+    {
+        // READ burst time from file and assign it to burstTime
+        fscanf(fp, "%*s %d", &length);
+    }
+    return length;
 }
 
 // Test funtions
@@ -122,14 +179,6 @@ void getRandExpTimeTest(int mean, int lowerLimit)
 int main(int argc, char *argv[])
 {
     int isFromFile = 0;
-    int N;
-    int Bcount;
-    int minB;
-    int avgB;
-    int minA;
-    int avgA;
-    char *alg;
-    char *inprefix;
     if (argc == 8)
     {
         // read CPU workload information from terminal
@@ -166,7 +215,7 @@ int main(int argc, char *argv[])
     }
 
     // create the readyqueue
-    struct readyqueue *rq = initReadyQueue();
+    rq = initReadyQueue();
 
     // create the threads
     pthread_t tids[MAX_THREADS]; // thread ids
@@ -184,7 +233,7 @@ int main(int argc, char *argv[])
 
         if (ret != 0)
         {
-            printf("thread create failed \n");
+            printf("ERROR: thread create failed \n");
             exit(1);
         }
         printf("thread %i with tid %u created\n", i,
