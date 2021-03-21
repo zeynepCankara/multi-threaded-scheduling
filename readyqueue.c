@@ -63,7 +63,7 @@ void pushBurst(struct readyqueue *rq, int thread_id, int burst_id, int length)
     pthread_mutex_unlock(&rqLock);
 }
 
-// ALG: first come first serve
+// >ALG>: First Come First Serve
 struct burst *fcfs(struct readyqueue *rq)
 {
     pthread_mutex_lock(&rqLock);
@@ -81,6 +81,62 @@ struct burst *fcfs(struct readyqueue *rq)
     pthread_mutex_unlock(&rqLock);
     headBurst->next = NULL;
     return headBurst;
+}
+
+// <ALG>: Short Job First
+struct burst *sjf(struct readyqueue *rq)
+{
+    pthread_mutex_lock(&rqLock);
+    if (rq->head == NULL)
+    {
+        pthread_mutex_unlock(&rqLock);
+        return NULL;
+    }
+    if (rq->head == rq->tail)
+    {
+        struct burst *node = rq->head;
+        rq->head = NULL;
+        rq->tail = NULL;
+        pthread_mutex_unlock(&rqLock);
+        return node;
+    }
+    struct burst *currNode = rq->head->next;
+    struct burst *prevNode = rq->head;
+    struct burst *prevMinLengthNode = NULL;
+    struct burst *minLengthNode = rq->head;
+    int minLength = minLengthNode->length;
+
+    while (currNode != NULL)
+    {
+        if (currNode->length < minLength)
+        {
+            minLengthNode = currNode;
+            prevMinLengthNode = prevNode;
+            minLength = minLengthNode->length;
+        }
+        prevNode = currNode;
+        currNode = currNode->next;
+    }
+
+    if (minLengthNode == rq->head)
+    {
+        rq->head = rq->head->next;
+    }
+
+    else if (minLengthNode == rq->tail)
+    {
+        rq->tail = prevMinLengthNode;
+        rq->tail->next = NULL;
+    }
+
+    else
+    {
+        prevMinLengthNode->next = minLengthNode->next;
+    }
+
+    pthread_mutex_unlock(&rqLock);
+    minLengthNode->next = NULL; // avoid access to NULL next
+    return minLengthNode;
 }
 
 // prints content of the readyqueue
