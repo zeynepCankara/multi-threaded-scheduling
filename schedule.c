@@ -14,6 +14,7 @@
 #include <unistd.h>
 #include <string.h>
 #include "readyqueue.h"
+#include <math.h>
 
 #define MAXTHREADS 20  /* max number of threads */
 #define MAXFILENAME 50 /* max length of a filename */
@@ -58,19 +59,87 @@ static void *do_task(void *arg_ptr)
     pthread_exit(NULL);
 }
 
+// exponentially distributed random number
+int getRandomNum(int min, int max, int interval) // 200, 300
+{
+
+    int randomNum = (rand() % (max - min + 100)) + min; // [200, 400)
+    randomNum = ((randomNum) / 100) * 100;              // 250 => 300, < 200
+
+    if (randomNum == min || randomNum == max)
+    {
+    }
+    else if (randomNum < min)
+    {
+        printf("FAILURE min %d\n", randomNum);
+        exit(0);
+    }
+    else if (randomNum > max)
+    {
+        printf("failure max %d\n", randomNum);
+        exit(0);
+    }
+    else
+    {
+    }
+
+    return randomNum;
+}
+
+// generates random exponential number from mean
+double generateRandomExpNum(int mean)
+{
+    if (mean == 0)
+    {
+        printf("ERROR: undefiened lambda param");
+        exit(0);
+    }
+    double lambda = 1 / (double)(mean);
+    double u;
+    u = rand() / (RAND_MAX + 1.0);
+    return -1 * log(1 - u) / lambda;
+}
+
+// time for CPU burst length and wait time
+double getRandExpTime(int mean, int lowerLimit)
+{
+    double randExpNum = generateRandomExpNum(mean);
+    while (randExpNum < lowerLimit)
+    {
+        randExpNum = generateRandomExpNum(mean);
+    }
+    return randExpNum;
+}
+
+// test functions
 void testReadyQueue(struct readyqueue *rq)
 {
-    pushBurst(rq, 1, 2, 3);
-    pushBurst(rq, 2, 3, 4);
-    pushBurst(rq, 3, 22, 5);
+    pushBurst(rq, 1, 1, 3);
+    pushBurst(rq, 2, 2, 4);
+    pushBurst(rq, 3, 3, 5);
     printReadyqueue(rq->head);
     struct burst *b = fcfs(rq);
     pushBurst(rq, 3, 4, 5);
     pushBurst(rq, 4, 5, 6);
     printReadyqueue(rq->head);
+    b = fcfs(rq);
+    b = fcfs(rq);
+    pushBurst(rq, 4, 6, 6);
+    pushBurst(rq, 4, 7, 6);
+    printReadyqueue(rq->head);
     deleteReadyqueue(rq->head);
 }
 
+void testRandomExpGenerator(int mean, int lowerLimit)
+{
+    for (int i = 0; i < 10; i++)
+    {
+        double randNum = getRandExpTime(mean, lowerLimit);
+        printf("generated random val: %f \n", randNum);
+    }
+}
+
+// Main Program
 int main(int argc, char *argv[])
 {
     int isFromFile = 0;
@@ -92,7 +161,7 @@ int main(int argc, char *argv[])
         minA = atoi(argv[5]);
         avgA = atoi(argv[6]);
         alg = argv[7];
-        printf("%d %d %d %d %d %d %s\n", N, Bcount, minB, avgB, minA, avgA, alg);
+        printf(" argv{N: %d, Bcount: %d, minB: %d, avgB: %d, minA: %d, avgA: %d, alg: %s}\n", N, Bcount, minB, avgB, minA, avgA, alg);
     }
     else if (argc == 5)
     {
@@ -107,7 +176,7 @@ int main(int argc, char *argv[])
             return -1;
         }
         inprefix = argv[4];
-        printf("%d %s %s\n", N, alg, inprefix);
+        printf("argv{N: %d, alg: %s, inprefix: %s}\n", N, alg, inprefix);
     }
     else
     {
@@ -119,7 +188,8 @@ int main(int argc, char *argv[])
 
     // test the readyqueue
     struct readyqueue *rq = initReadyQueue();
-    testReadyQueue(rq);
+    //testReadyQueue(rq);
+    testRandomExpGenerator(avgA, minA);
 
     return 0;
 }
