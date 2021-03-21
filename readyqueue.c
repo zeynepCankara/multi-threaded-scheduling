@@ -13,7 +13,7 @@
 #include <stdlib.h>
 #include <pthread.h>
 
-pthread_mutex_t rq_lock;
+pthread_mutex_t rqLock;
 
 // initialises the ready queue
 struct readyqueue *initReadyQueue()
@@ -21,7 +21,7 @@ struct readyqueue *initReadyQueue()
     struct readyqueue *rq = malloc(sizeof(struct readyqueue));
     rq->head = NULL;
     rq->tail = NULL;
-    if (pthread_mutex_init(&rq_lock, NULL) != 0)
+    if (pthread_mutex_init(&rqLock, NULL) != 0)
     {
         printf("ERROR: mutex lock can't initialise readyqueue!\n");
         return NULL;
@@ -45,7 +45,7 @@ struct burst *createBurst(int thread_id, int burst_id, int length)
 */
 void pushBurst(struct readyqueue *rq, int thread_id, int burst_id, int length)
 {
-    pthread_mutex_lock(&rq_lock);
+    pthread_mutex_lock(&rqLock);
     struct timeval time;
     struct burst *node = createBurst(thread_id, burst_id, length);
     if (rq->head != NULL) // readyqueue is not empty
@@ -60,37 +60,27 @@ void pushBurst(struct readyqueue *rq, int thread_id, int burst_id, int length)
     }
     gettimeofday(&time, NULL);
     rq->tail->time = time;
-    pthread_mutex_unlock(&rq_lock);
+    pthread_mutex_unlock(&rqLock);
 }
 
-// pops a cpu burst out of the readyqueue
-struct burst *popBurst(struct burst *head)
+// ALG: first come first serve
+struct burst *fcfs(struct readyqueue *rq)
 {
-    struct burst *node = createBurst(-1, -1, -1); // create a node with default values
-
-    if (head->next == NULL)
+    pthread_mutex_lock(&rqLock);
+    if (rq->head == NULL)
     {
-        node->thread_id = head->thread_id;
-        node->burst_id = head->burst_id;
-        node->length = head->length;
-        free(head);
-        return node;
+        pthread_mutex_unlock(&rqLock);
+        return NULL;
     }
-
-    /* get to the second to last node in the list */
-    struct burst *current = head;
-    while (current->next->next != NULL)
+    struct burst *headBurst = rq->head;
+    rq->head = headBurst->next;
+    if (headBurst == rq->tail)
     {
-        current = current->next;
+        rq->tail = NULL;
     }
-
-    /* now current points to the second to last item of the list, so let's remove current->next */
-    node->thread_id = current->next->thread_id;
-    node->burst_id = current->next->burst_id;
-    node->length = current->next->length;
-    free(current->next);
-    current->next = NULL;
-    return node;
+    pthread_mutex_unlock(&rqLock);
+    headBurst->next = NULL;
+    return headBurst;
 }
 
 // prints content of the readyqueue

@@ -58,6 +58,19 @@ static void *do_task(void *arg_ptr)
     pthread_exit(NULL);
 }
 
+void testReadyQueue(struct readyqueue *rq)
+{
+    pushBurst(rq, 1, 2, 3);
+    pushBurst(rq, 2, 3, 4);
+    pushBurst(rq, 3, 22, 5);
+    printReadyqueue(rq->head);
+    struct burst *b = fcfs(rq);
+    pushBurst(rq, 3, 4, 5);
+    pushBurst(rq, 4, 5, 6);
+    printReadyqueue(rq->head);
+    deleteReadyqueue(rq->head);
+}
+
 int main(int argc, char *argv[])
 {
     int isFromFile = 0;
@@ -105,18 +118,8 @@ int main(int argc, char *argv[])
     }
 
     // test the readyqueue
-    struct burst *test_rq = (burst *)malloc(sizeof(burst));
-
-    test_rq->burst_id = 1;
-    test_rq->next = (burst *)malloc(sizeof(burst));
-    test_rq->next->burst_id = 2;
-    test_rq->next->next = (struct burst *)malloc(sizeof(burst));
-    test_rq->next->next->burst_id = 3;
-    test_rq->next->next->next = (struct burst *)malloc(sizeof(burst));
-    test_rq->next->next->next->burst_id = 4;
-    test_rq->next->next->next->next = NULL;
-    printReadyqueue(test_rq);
-    deleteReadyqueue(test_rq);
+    struct readyqueue *rq = initReadyQueue();
+    testReadyQueue(rq);
 
     return 0;
 }
