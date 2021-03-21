@@ -60,7 +60,8 @@ double getRandExpTime(int mean, int lowerLimit)
     return randExpNum;
 }
 
-// test functions
+// Test funtions
+
 void testReadyQueue(struct readyqueue *rq)
 {
     pushBurst(rq, 1, 1, 3);
@@ -176,6 +177,7 @@ int main(int argc, char *argv[])
     }
 
     printf("main: all threads terminated\n");
+    testRandomExpGenerator(avgA, minA);
 
     return 0;
 }
