@@ -16,45 +16,21 @@
 #include "readyqueue.h"
 #include <math.h>
 
-#define MAXTHREADS 20  /* max number of threads */
-#define MAXFILENAME 50 /* max length of a filename */
+#define MAX_THREADS 10 // maximum number of threads
 
-/*
-*  thread function will take a pointer to this structure
-*/
-struct arg
+// argument list for the thread
+typedef struct argvThread
 {
-    int n;       /* min value */
-    int m;       /* max value */
-    int t_index; /* the index of the created thread */
-};
+    int t_index; // thread id
+} argvThread;
 
-/* this is function to be executed by the threads */
 static void *do_task(void *arg_ptr)
 {
-    int i;
-    FILE *fp;
-    char filename[MAXFILENAME];
+    // init variables
 
-    printf("thread %d started\n", ((struct arg *)arg_ptr)->t_index);
+    printf("thread %d started\n", ((struct argvThread *)arg_ptr)->t_index);
 
-    sprintf(filename, "output_of_thread%d.txt",
-            ((struct arg *)arg_ptr)->t_index);
-
-    fp = fopen(filename, "w");
-    if (fp == NULL)
-    {
-        perror("do_task:");
-        exit(1);
-    }
-
-    for (i = ((struct arg *)arg_ptr)->n;
-         i <= ((struct arg *)arg_ptr)->m; ++i)
-    {
-        fprintf(fp, "integer = %d\n", i);
-    }
-
-    fclose(fp);
+    // perform task
 
     pthread_exit(NULL);
 }
@@ -163,10 +139,43 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    // test the readyqueue
+    // create the readyqueue
     struct readyqueue *rq = initReadyQueue();
-    //testReadyQueue(rq);
-    //testRandomExpGenerator(avgA, minA);
+
+    // create the threads
+    pthread_t tids[MAX_THREADS];           // thread ids
+    struct argvThread t_args[MAX_THREADS]; /*thread function arguments*/
+
+    int ret;
+
+    for (int i = 0; i < N; ++i)
+    {
+        t_args[i].t_index = i;
+
+        ret = pthread_create(&(tids[i]),
+                             NULL, do_task, (void *)&(t_args[i]));
+
+        if (ret != 0)
+        {
+            printf("thread create failed \n");
+            exit(1);
+        }
+        printf("thread %i with tid %u created\n", i,
+               (unsigned int)tids[i]);
+    }
+
+    printf("main: waiting all threads to terminate\n");
+    for (int i = 0; i < N; ++i)
+    {
+        ret = pthread_join(tids[i], NULL);
+        if (ret != 0)
+        {
+            printf("thread join failed \n");
+            exit(0);
+        }
+    }
+
+    printf("main: all threads terminated\n");
 
     return 0;
 }
