@@ -131,7 +131,7 @@ static void *do_task(void *arg_ptr)
         pthread_cond_wait(&(t_args[t_id].t_cond), &t_mutex); // wait cond mutex
         // Get Sleep Duration
         int sleepTime = getInterarrivalLength(NULL);
-        usleep(sleepTime); // in ms *1000
+        usleep(sleepTime * 1000); // in ms
         b_index++;
     }
     pushBurst(rq, t_id, Bcount, -1);
@@ -231,7 +231,7 @@ int main(int argc, char *argv[])
 
         printf("(server) burst time: %d, t_id: %d, b_index, %d \n", node->length, node->thread_id, node->burst_id);
         // collect statistics
-        usleep(node->length); // sleep till burst time *1000
+        usleep(node->length * 1000); // sleep till burst time
         pthread_cond_signal(&(t_args[node->thread_id].t_cond));
         free(node);
     }
