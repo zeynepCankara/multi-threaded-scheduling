@@ -14,6 +14,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <math.h>
+#include <sys/time.h>
 
 #include "readyqueue.h"
 #include "test.h"
@@ -33,12 +34,12 @@ struct readyqueue *rq;
 
 // for thread management
 pthread_mutex_t serverMutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t serverCond = PTHREAD_COND_INITIALIZER;
 
 // argument list for the thread
 typedef struct argvThread
 {
     int t_index; // thread id
+    pthread_t tid;
     pthread_attr_t t_attr;
     pthread_cond_t t_cond; // condition variable
 } argvThread;
@@ -118,22 +119,24 @@ static void *do_task(void *arg_ptr)
     printf("thread %d started\n", t_id + 1);
 
     // perform task...
-    for (int b_index = 0; b_index < Bcount; b_index++)
+    int b_index = 0;
+    while (b_index < Bcount)
     {
         // Get Burst Duration
         int burstTime = getBurstLength(NULL);
+        printf(" (do_task)-burstTime: %d, t_id: %d, b_index, %d \n", burstTime, t_id, b_index);
         // Send burst duration to queue
         pushBurst(rq, t_id, b_index, burstTime);
         pthread_cond_signal(&t_cond_wait);
         pthread_cond_wait(&(t_args[t_id].t_cond), &t_mutex); // wait cond mutex
         // Get Sleep Duration
         int sleepTime = getInterarrivalLength(NULL);
-        usleep(sleepTime * 1000); // in ms
+        usleep(sleepTime); // in ms *1000
+        b_index++;
     }
-
     pushBurst(rq, t_id, Bcount, -1);
     pthread_cond_signal(&t_cond_wait);
-    pthread_exit(NULL);
+    pthread_exit(0);
 }
 
 // Main Program
@@ -189,7 +192,7 @@ int main(int argc, char *argv[])
         pthread_attr_init(&t_args[i].t_attr);
         t_args[i].t_cond = (pthread_cond_t)PTHREAD_COND_INITIALIZER;
 
-        ret = pthread_create(&(tids[i]),
+        ret = pthread_create(&t_args[i].tid,
                              &t_args[i].t_attr, do_task, (void *)&(t_args[i]));
 
         if (ret != 0)
@@ -198,7 +201,7 @@ int main(int argc, char *argv[])
             exit(1);
         }
         printf("thread %i with tid %u created\n", i,
-               (unsigned int)tids[i]);
+               (unsigned int)t_args[i].tid);
     }
 
     // serve thread logic
@@ -214,28 +217,31 @@ int main(int argc, char *argv[])
         if (node == NULL)
         {
             pthread_mutex_lock(&serverMutex);
-            pthread_cond_wait(&serverCond, &serverMutex);
+            pthread_cond_wait(&t_cond_wait, &serverMutex);
             pthread_mutex_unlock(&serverMutex);
             node = getBurst(rq, alg);
         }
 
-        if (node->length <= 0) // processed
+        if (node->length <= 0)
         {
+            count--;
             free(node);
-            count -= 1;
             continue;
         }
 
+        printf("(server) burst time: %d, t_id: %d, b_index, %d \n", node->length, node->thread_id, node->burst_id);
         // collect statistics
-
-        usleep(node->length * 1000); // sleep till burst time
+        usleep(node->length); // sleep till burst time *1000
+        pthread_cond_signal(&(t_args[node->thread_id].t_cond));
         free(node);
     }
 
     printf("main: waiting all threads to terminate\n");
-    for (int i = 0; i < N; ++i)
+    for (int i = 0; i < N; i++)
     {
-        ret = pthread_join(tids[i], NULL);
+        printf("i %d\n", i);
+        ret = pthread_join(t_args[i].tid, NULL);
+        //ret = pthread_join(tids[i], NULL);
         if (ret != 0)
         {
             printf("thread join failed \n");
