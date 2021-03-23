@@ -104,16 +104,6 @@ int getInterarrivalLength(FILE *fp)
     return length;
 }
 
-void getRandExpTimeTest(int mean, int lowerLimit)
-{
-    int CNT_RANDOM_NUM = 10;
-    for (int i = 0; i < CNT_RANDOM_NUM; i++)
-    {
-        double randNum = getRandExpTime(mean, lowerLimit);
-        printf("generated random val: %f \n", randNum);
-    }
-}
-
 static void *do_task(void *arg_ptr)
 {
     int t_id = ((struct argvThread *)arg_ptr)->t_index;
