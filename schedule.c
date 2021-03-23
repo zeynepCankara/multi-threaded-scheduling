@@ -38,8 +38,8 @@ pthread_mutex_t serverMutex = PTHREAD_MUTEX_INITIALIZER;
 // argument list for the thread
 typedef struct argvThread
 {
-    int t_index; // thread id
-    pthread_t tid;
+    int t_index;   // thread index
+    pthread_t tid; // thread id
     pthread_attr_t t_attr;
     pthread_cond_t t_cond; // condition variable
 } argvThread;
@@ -181,9 +181,6 @@ int main(int argc, char *argv[])
     // create the readyqueue
     rq = initReadyQueue();
 
-    // create the threads
-    pthread_t tids[MAX_THREADS]; // thread ids
-
     int ret;
 
     for (int i = 0; i < N; ++i)
@@ -204,7 +201,7 @@ int main(int argc, char *argv[])
                (unsigned int)t_args[i].tid);
     }
 
-    // serve thread logic
+    // server thread logic
     int count = N;
     struct timeval startTime;
     struct timeval exeTime;
@@ -222,7 +219,7 @@ int main(int argc, char *argv[])
             node = getBurst(rq, alg);
         }
 
-        if (node->length <= 0)
+        if (node->length <= 0) // node processed
         {
             count--;
             free(node);
@@ -239,9 +236,7 @@ int main(int argc, char *argv[])
     printf("main: waiting all threads to terminate\n");
     for (int i = 0; i < N; i++)
     {
-        printf("i %d\n", i);
         ret = pthread_join(t_args[i].tid, NULL);
-        //ret = pthread_join(tids[i], NULL);
         if (ret != 0)
         {
             printf("thread join failed \n");

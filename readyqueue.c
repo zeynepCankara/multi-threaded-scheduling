@@ -139,6 +139,62 @@ struct burst *sjf(struct readyqueue *rq)
     return minLengthNode;
 }
 
+// <ALG>: PRIO (smallest thread id has the highest priority)
+struct burst *prio(struct readyqueue *rq)
+{
+    pthread_mutex_lock(&rqLock);
+    if (rq->head == NULL)
+    {
+        pthread_mutex_unlock(&rqLock);
+        return NULL;
+    }
+    if (rq->head == rq->tail)
+    {
+        struct burst *node = rq->head;
+        rq->head = NULL;
+        rq->tail = NULL;
+        pthread_mutex_unlock(&rqLock);
+        return node;
+    }
+    struct burst *currNode = rq->head->next;
+    struct burst *prevNode = rq->head;
+    struct burst *prevMaxPriorityNode = NULL;
+    struct burst *maxPriorityNode = rq->head;
+    int maxPriority = maxPriorityNode->thread_id;
+
+    while (currNode != NULL)
+    {
+        if (currNode->thread_id < maxPriority)
+        {
+            maxPriorityNode = currNode;
+            prevMaxPriorityNode = prevNode;
+            maxPriority = maxPriorityNode->thread_id;
+        }
+        prevNode = currNode;
+        currNode = currNode->next;
+    }
+
+    if (maxPriorityNode == rq->head)
+    {
+        rq->head = rq->head->next;
+    }
+
+    else if (maxPriorityNode == rq->tail)
+    {
+        rq->tail = prevMaxPriorityNode;
+        rq->tail->next = NULL;
+    }
+
+    else
+    {
+        prevMaxPriorityNode->next = maxPriorityNode->next;
+    }
+
+    pthread_mutex_unlock(&rqLock);
+    maxPriorityNode->next = NULL; // avoid access to NULL next
+    return maxPriorityNode;
+}
+
 // prints content of the readyqueue
 void printReadyqueue(burst *head)
 {

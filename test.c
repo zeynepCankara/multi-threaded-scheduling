@@ -43,3 +43,24 @@ void sjfTest(struct readyqueue *rq)
     printf("(8, 9, 2, 1) printed \n");
     deleteReadyqueue(rq->head);
 }
+
+void prioTest(struct readyqueue *rq)
+{
+    pushBurst(rq, 8, 8, 8);
+    pushBurst(rq, 7, 7, 7);
+    pushBurst(rq, 9, 9, 9);
+    printReadyqueue(rq->head);
+    printf("(8, 7, 9) printed \n");
+    struct burst *b = prio(rq);
+    pushBurst(rq, 3, 3, 3);
+    pushBurst(rq, 5, 5, 5);
+    printReadyqueue(rq->head);
+    printf("(8, 9, 3, 5) printed \n");
+    b = prio(rq);
+    b = prio(rq);
+    pushBurst(rq, 2, 2, 2);
+    pushBurst(rq, 1, 1, 1);
+    printReadyqueue(rq->head);
+    printf("(8, 9, 2, 1) printed \n");
+    deleteReadyqueue(rq->head);
+}

@@ -7,5 +7,6 @@
 
 void fcfsTest(struct readyqueue *rq);
 void sjfTest(struct readyqueue *rq);
+void prioTest(struct readyqueue *rq);
 
 #endif
