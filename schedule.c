@@ -108,11 +108,11 @@ static void *do_task(void *arg_ptr)
 {
     int t_id = ((struct argvThread *)arg_ptr)->t_index;
     pthread_mutex_t t_mutex = PTHREAD_MUTEX_INITIALIZER;
-    printf("thread %d started\n", t_id + 1);
+    printf("thread %d started\n", t_id);
 
     // perform task...
-    int b_index = 0;
-    while (b_index < Bcount)
+    int b_index = 1;
+    while (b_index <= Bcount)
     {
         // Get Burst Duration
         int burstTime = getBurstLength(NULL);
@@ -177,7 +177,7 @@ int main(int argc, char *argv[])
 
     for (int i = 0; i < N; ++i)
     {
-        t_args[i].t_index = i;
+        t_args[i].t_index = i + 1;
         pthread_attr_init(&t_args[i].t_attr);
         t_args[i].t_cond = (pthread_cond_t)PTHREAD_COND_INITIALIZER;
 
