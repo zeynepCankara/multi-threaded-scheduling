@@ -49,6 +49,9 @@ typedef struct argvThread
 struct argvThread t_args[MAX_THREADS]; // pass the thread arguments
 pthread_cond_t t_cond_wait = PTHREAD_COND_INITIALIZER;
 
+// for keeping statistics
+int threadTotalWaitingTime[MAX_THREADS];
+
 // generates random exponential number from mean
 double generateRandomExpNum(int mean)
 {
@@ -170,6 +173,12 @@ int main(int argc, char *argv[])
         return -1;
     }
 
+    // initialise statistics variables
+    for (int i = 0; i < N; i++)
+    {
+        threadTotalWaitingTime[i] = 0;
+    }
+
     // create the readyqueue
     rq = initReadyQueue();
 
@@ -197,6 +206,7 @@ int main(int argc, char *argv[])
     int count = N;
     struct timeval startTime;
     struct timeval exeTime;
+    int timeFlag = 1;
     while (count > 0)
     {
         // select node based on the ALG
@@ -225,8 +235,24 @@ int main(int argc, char *argv[])
             free(node);
             continue;
         }
-
+        // node info
         printf("(server) burst time: %d, t_id: %d, b_index, %d \n", node->length, node->thread_id, node->burst_id);
+
+        // collect statistics
+        if (timeFlag > 0)
+        {
+            gettimeofday(&startTime, NULL);
+            exeTime = startTime;
+            timeFlag = 0;
+        }
+        else
+        {
+            gettimeofday(&exeTime, NULL);
+        }
+
+        int threadWaitingTime = ((exeTime.tv_sec - node->time.tv_sec) * 1000000 + (exeTime.tv_usec - node->time.tv_usec)) / 1000;
+        threadTotalWaitingTime[node->thread_id - 1] += threadWaitingTime;
+
         // collect statistics
         usleep(node->length * 1000); // sleep till burst time
         pthread_cond_signal(&(t_args[node->thread_id].t_cond));
@@ -237,6 +263,7 @@ int main(int argc, char *argv[])
     for (int i = 0; i < N; i++)
     {
         ret = pthread_join(t_args[i].tid, NULL);
+        printf("\tTotal waiting time: %d ms.\n", threadTotalWaitingTime[i]);
         if (ret != 0)
         {
             printf("thread join failed \n");
