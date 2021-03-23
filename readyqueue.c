@@ -164,3 +164,21 @@ void deleteReadyqueue(struct burst *head)
         current = next;
     }
 }
+
+struct burst *getBurst(struct readyqueue *rq, char *alg)
+{
+    if (strcmp(alg, "FCFS") == 0)
+    {
+        return fcfs(rq);
+    }
+    else if (strcmp(alg, "SJF") == 0)
+    {
+        return sjf(rq);
+    }
+    else
+    {
+        printf("ERROR: algorithm not available \n");
+        printf("Options <ALG>: FCFS, SJF \n");
+        return NULL;
+    }
+}

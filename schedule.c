@@ -31,6 +31,10 @@ char *alg;
 char *inprefix;
 struct readyqueue *rq;
 
+// for thread management
+pthread_mutex_t serverMutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t serverCond = PTHREAD_COND_INITIALIZER;
+
 // argument list for the thread
 typedef struct argvThread
 {
@@ -41,31 +45,6 @@ typedef struct argvThread
 
 struct argvThread t_args[MAX_THREADS]; // pass the thread arguments
 pthread_cond_t t_cond_wait = PTHREAD_COND_INITIALIZER;
-
-static void *do_task(void *arg_ptr)
-{
-    int t_id = ((struct argvThread *)arg_ptr)->t_index;
-    pthread_mutex_t t_mutex = PTHREAD_MUTEX_INITIALIZER;
-    printf("thread %d started\n", t_id + 1);
-
-    // perform task...
-    for (int b_index = 0; b_index < Bcount; b_index++)
-    {
-        // Get Burst Duration
-        int burstTime = getBurstLength(NULL);
-        // Send burst duration to queue
-        pushBurst(rq, t_id, b_index, burstTime);
-        pthread_cond_signal(&t_cond_wait);
-        pthread_cond_wait(&(t_args[t_id].t_cond), &t_mutex); // wait cond mutex
-        // Get Sleep Duration
-        int sleepTime = getInterarrivalLength(NULL);
-        usleep(sleepTime * 1000); // in ms
-    }
-
-    pushBurst(rq, t_id, Bcount, -1);
-    pthread_cond_signal(&t_cond_wait);
-    pthread_exit(NULL);
-}
 
 // generates random exponential number from mean
 double generateRandomExpNum(int mean)
@@ -130,6 +109,31 @@ void getRandExpTimeTest(int mean, int lowerLimit)
         double randNum = getRandExpTime(mean, lowerLimit);
         printf("generated random val: %f \n", randNum);
     }
+}
+
+static void *do_task(void *arg_ptr)
+{
+    int t_id = ((struct argvThread *)arg_ptr)->t_index;
+    pthread_mutex_t t_mutex = PTHREAD_MUTEX_INITIALIZER;
+    printf("thread %d started\n", t_id + 1);
+
+    // perform task...
+    for (int b_index = 0; b_index < Bcount; b_index++)
+    {
+        // Get Burst Duration
+        int burstTime = getBurstLength(NULL);
+        // Send burst duration to queue
+        pushBurst(rq, t_id, b_index, burstTime);
+        pthread_cond_signal(&t_cond_wait);
+        pthread_cond_wait(&(t_args[t_id].t_cond), &t_mutex); // wait cond mutex
+        // Get Sleep Duration
+        int sleepTime = getInterarrivalLength(NULL);
+        usleep(sleepTime * 1000); // in ms
+    }
+
+    pushBurst(rq, t_id, Bcount, -1);
+    pthread_cond_signal(&t_cond_wait);
+    pthread_exit(NULL);
 }
 
 // Main Program
@@ -197,6 +201,37 @@ int main(int argc, char *argv[])
                (unsigned int)tids[i]);
     }
 
+    // serve thread logic
+    int count = N;
+    struct timeval startTime;
+    struct timeval exeTime;
+    while (count > 0)
+    {
+        // select node based on the ALG
+        struct burst *node = getBurst(rq, alg);
+
+        // handle the threads
+        if (node == NULL)
+        {
+            pthread_mutex_lock(&serverMutex);
+            pthread_cond_wait(&serverCond, &serverMutex);
+            pthread_mutex_unlock(&serverMutex);
+            node = getBurst(rq, alg);
+        }
+
+        if (node->length <= 0) // processed
+        {
+            free(node);
+            count -= 1;
+            continue;
+        }
+
+        // collect statistics
+
+        usleep(node->length * 1000); // sleep till burst time
+        free(node);
+    }
+
     printf("main: waiting all threads to terminate\n");
     for (int i = 0; i < N; ++i)
     {
@@ -209,6 +244,8 @@ int main(int argc, char *argv[])
     }
 
     printf("main: all threads terminated\n");
+    deleteReadyqueue(rq->head);
+    free(rq);
 
     return 0;
 }

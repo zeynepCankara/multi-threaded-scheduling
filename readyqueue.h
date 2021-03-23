@@ -25,6 +25,7 @@ typedef struct readyqueue
 struct readyqueue *initReadyQueue();
 struct burst *createBurst(int thread_id, int burst_id, int length);
 void pushBurst(struct readyqueue *rq, int thread_id, int burst_id, int length);
+struct burst *getBurst(struct readyqueue *rq, char *alg);
 struct burst *sjf(struct readyqueue *rq);
 struct burst *fcfs(struct readyqueue *rq);
 
