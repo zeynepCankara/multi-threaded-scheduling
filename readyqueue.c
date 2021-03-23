@@ -13,6 +13,10 @@
 #include <stdlib.h>
 #include <pthread.h>
 
+#define MAX_THREADS 10 // maximum number of threads
+
+extern int t_vruntime[MAX_THREADS]; // virtual runtime of each thread
+
 pthread_mutex_t rqLock;
 
 // initialises the ready queue
@@ -83,7 +87,7 @@ struct burst *fcfs(struct readyqueue *rq)
     return headBurst;
 }
 
-// <ALG>: Short Job First
+// <ALG>, SJF: Short Job First
 struct burst *sjf(struct readyqueue *rq)
 {
     pthread_mutex_lock(&rqLock);
@@ -139,7 +143,7 @@ struct burst *sjf(struct readyqueue *rq)
     return minLengthNode;
 }
 
-// <ALG>: PRIO (smallest thread id has the highest priority)
+// <ALG>, PRIO: (smallest thread id has the highest priority)
 struct burst *prio(struct readyqueue *rq)
 {
     pthread_mutex_lock(&rqLock);
@@ -169,6 +173,63 @@ struct burst *prio(struct readyqueue *rq)
             maxPriorityNode = currNode;
             prevMaxPriorityNode = prevNode;
             maxPriority = maxPriorityNode->thread_id;
+        }
+        prevNode = currNode;
+        currNode = currNode->next;
+    }
+
+    if (maxPriorityNode == rq->head)
+    {
+        rq->head = rq->head->next;
+    }
+
+    else if (maxPriorityNode == rq->tail)
+    {
+        rq->tail = prevMaxPriorityNode;
+        rq->tail->next = NULL;
+    }
+
+    else
+    {
+        prevMaxPriorityNode->next = maxPriorityNode->next;
+    }
+
+    pthread_mutex_unlock(&rqLock);
+    maxPriorityNode->next = NULL; // avoid access to NULL next
+    return maxPriorityNode;
+}
+
+// <ALG>, VRUNTIME: (select the burst with the lowest virtual runtime)
+struct burst *vruntime(struct readyqueue *rq)
+{
+    // find the node
+    pthread_mutex_lock(&rqLock);
+    if (rq->head == NULL)
+    {
+        pthread_mutex_unlock(&rqLock);
+        return NULL;
+    }
+    if (rq->head == rq->tail)
+    {
+        struct burst *node = rq->head;
+        rq->head = NULL;
+        rq->tail = NULL;
+        pthread_mutex_unlock(&rqLock);
+        return node;
+    }
+    struct burst *currNode = rq->head->next;
+    struct burst *prevNode = rq->head;
+    struct burst *prevMaxPriorityNode = NULL;
+    struct burst *maxPriorityNode = rq->head;
+    int maxPriority = t_vruntime[maxPriorityNode->thread_id];
+
+    while (currNode != NULL)
+    {
+        if (t_vruntime[currNode->thread_id] < maxPriority)
+        {
+            maxPriorityNode = currNode;
+            prevMaxPriorityNode = prevNode;
+            maxPriority = t_vruntime[maxPriorityNode->thread_id];
         }
         prevNode = currNode;
         currNode = currNode->next;
@@ -230,6 +291,14 @@ struct burst *getBurst(struct readyqueue *rq, char *alg)
     else if (strcmp(alg, "SJF") == 0)
     {
         return sjf(rq);
+    }
+    else if (strcmp(alg, "PRIO") == 0)
+    {
+        return prio(rq);
+    }
+    else if (strcmp(alg, "VRUNTIME") == 0)
+    {
+        return vruntime(rq);
     }
     else
     {

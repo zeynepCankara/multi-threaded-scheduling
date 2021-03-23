@@ -35,6 +35,8 @@ struct readyqueue *rq;
 // for thread management
 pthread_mutex_t serverMutex = PTHREAD_MUTEX_INITIALIZER;
 
+int t_vruntime[MAX_THREADS] = {0}; // virtual runtime of each thread
+
 // argument list for the thread
 typedef struct argvThread
 {
@@ -221,6 +223,14 @@ int main(int argc, char *argv[])
 
         if (node->length <= 0) // node processed
         {
+            // update virtual runtime
+            if (strcmp(alg, "VRUNTIME") == 0)
+            {
+                int t_id = node->thread_id;
+                int burst_time = node->length;
+                t_vruntime[t_id] += (burst_time * (0.7 + 0.3 * t_id));
+            }
+            // update the state
             count--;
             free(node);
             continue;
