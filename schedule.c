@@ -33,6 +33,7 @@ int avgA;
 char *alg;
 char *inprefix;
 struct readyqueue *rq;
+int isFromFile;
 
 // for thread management
 pthread_mutex_t serverMutex = PTHREAD_MUTEX_INITIALIZER;
@@ -57,6 +58,8 @@ int burstTotalWaitingTime[MAX_BCOUNT];
 
 // keep track of the reading from the file and thread
 FILE *readFromThread[MAX_THREADS];
+char *readFromLine[MAX_THREADS] = {NULL};
+size_t readFromLen[MAX_THREADS] = {0};
 
 // generates random exponential number from mean
 double generateRandomExpNum(int mean)
@@ -83,34 +86,46 @@ double getRandExpTime(int mean, int lowerLimit)
     return randExpNum;
 }
 
-int getBurstLength(FILE *fp)
+int getBurstLength()
 {
     int length = 0;
-    if (fp == NULL)
-    {
-        length = getRandExpTime(avgB, minB);
-    }
-    else
-    {
-        // READ burst time from file and assign it to burstTime
-        fscanf(fp, "%*s %d", &length);
-    }
+
+    length = getRandExpTime(avgB, minB);
+
     return length;
 }
 
-int getInterarrivalLength(FILE *fp)
+int getInterarrivalLength()
 {
     int length = 0;
-    if (fp == NULL)
-    {
-        length = getRandExpTime(avgA, minA);
-    }
-    else
-    {
-        // READ burst time from file and assign it to burstTime
-        fscanf(fp, "%*s %d", &length);
-    }
+
+    length = getRandExpTime(avgA, minA);
+
     return length;
+}
+
+void getTimeFromFile(int t_id, char *timeBuffer[])
+{
+    // returns both burst time and sleep time
+    //int length = 0;
+    FILE *fp = readFromThread[t_id - 1];
+    ssize_t isLine;
+    if ((isLine = getline(&readFromLine[t_id - 1], &readFromLen[t_id - 1], fp)) != -1)
+    {
+        char buf[LINE_LEN];
+        sprintf(buf, "%zu", isLine);
+        int i = 0;
+        char *p = strtok(buf, " ");
+        //char *timeBuffer[2]; // interarrival burst
+        while (p != NULL)
+        {
+            timeBuffer[i++] = p;
+            p = strtok(NULL, "/");
+        }
+
+        for (i = 0; i < 2; ++i)
+            printf("%s\n", timeBuffer[i]);
+    }
 }
 
 static void *do_task(void *arg_ptr)
@@ -124,15 +139,29 @@ static void *do_task(void *arg_ptr)
     while (b_index <= Bcount)
     {
         // Get Burst Duration
-        int burstTime = getBurstLength(NULL);
+        int burstTime;
+        // Get Sleep Duration
+        int sleepTime;
+        if (isFromFile == 0)
+        {
+            burstTime = getBurstLength();
+            sleepTime = getInterarrivalLength();
+        }
+        else
+        {
+            char *timeBuffer[2];
+            getTimeFromFile(t_id, timeBuffer);
+            burstTime = atoi(timeBuffer[0]);
+            sleepTime = atoi(timeBuffer[1]);
+            printf(" (do_task)-burstTime: %d\n", burstTime);
+            printf(" (do_task)-sleepTime: %d\n", sleepTime);
+        }
         printf(" (do_task)-burstTime: %d, t_id: %d, b_index, %d \n", burstTime, t_id, b_index);
         // Send burst duration to queue
         pushBurst(rq, t_id, b_index, burstTime);
         pthread_cond_signal(&t_cond_wait);
         pthread_cond_wait(&(t_args[t_id].t_cond), &t_mutex); // wait cond mutex
-        // Get Sleep Duration
-        int sleepTime = getInterarrivalLength(NULL);
-        usleep(sleepTime * 1000); // in ms
+        usleep(sleepTime * 1000);                            // in ms
         b_index++;
     }
     pushBurst(rq, t_id, Bcount, -1);
@@ -143,7 +172,7 @@ static void *do_task(void *arg_ptr)
 // Main Program
 int main(int argc, char *argv[])
 {
-    int isFromFile = 0;
+    isFromFile = 0;
     if (argc == 8)
     {
         // read CPU workload information from terminal
@@ -205,9 +234,10 @@ int main(int argc, char *argv[])
         fp = fopen("./afile-1.txt", "r");
         if (fp == NULL)
             exit(EXIT_FAILURE);
-
+        Bcount = 0;
         while ((read = getline(&line, &len, fp)) != -1)
         {
+            Bcount += 2;
             printf("Retrieved line of length %zu:\n", read);
             printf("%s", line);
         }
@@ -215,7 +245,7 @@ int main(int argc, char *argv[])
         fclose(fp);
         if (line)
             free(line);
-        exit(EXIT_SUCCESS);
+        //exit(EXIT_SUCCESS);
     }
 
     // initialise statistics variables
