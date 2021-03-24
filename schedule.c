@@ -19,8 +19,9 @@
 #include "readyqueue.h"
 #include "test.h"
 
-#define MAX_THREADS 10    // maximum number of threads
-#define MAX_BCOUNT 100000 // maximum number of threads
+#define MAX_THREADS 10   // maximum number of threads
+#define MAX_BCOUNT 10000 // maximum number of threads
+#define LINE_LEN 10000   // length of a line
 
 // global variables
 int N;
@@ -53,6 +54,9 @@ pthread_cond_t t_cond_wait = PTHREAD_COND_INITIALIZER;
 // for keeping statistics
 int threadTotalWaitingTime[MAX_THREADS];
 int burstTotalWaitingTime[MAX_BCOUNT];
+
+// keep track of the reading from the file and thread
+FILE *readFromThread[MAX_THREADS];
 
 // generates random exponential number from mean
 double generateRandomExpNum(int mean)
@@ -173,6 +177,45 @@ int main(int argc, char *argv[])
         printf("read from terminal mode:$ schedule <N> <Bcount> <minB> <avgB> <minA> <avgA> <ALG>\n");
         printf("read from file mode:$ schedule <N> <ALG> -f <inprefix>\n");
         return -1;
+    }
+    if (isFromFile)
+    {
+        // read the contents of the input files
+        FILE *fp;
+        char *line = NULL;
+        size_t len = 0;
+        ssize_t read;
+
+        for (int i = 1; i <= N; i++)
+        {
+            char threadInprefix[100];
+            strcpy(threadInprefix, inprefix);
+            strcat(threadInprefix, "-");
+            char N_str[100];
+            sprintf(N_str, "%d", N);
+            strcat(threadInprefix, N_str);
+            strcat(threadInprefix, ".txt");
+            fp = fopen(threadInprefix, "r");
+            if (fp == NULL)
+                exit(EXIT_FAILURE);
+            printf("attaching file to thread: %d\n", i);
+            readFromThread[i - 1] = fp;
+        }
+
+        fp = fopen("./afile-1.txt", "r");
+        if (fp == NULL)
+            exit(EXIT_FAILURE);
+
+        while ((read = getline(&line, &len, fp)) != -1)
+        {
+            printf("Retrieved line of length %zu:\n", read);
+            printf("%s", line);
+        }
+
+        fclose(fp);
+        if (line)
+            free(line);
+        exit(EXIT_SUCCESS);
     }
 
     // initialise statistics variables
