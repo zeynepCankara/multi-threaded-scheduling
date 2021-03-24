@@ -19,7 +19,8 @@
 #include "readyqueue.h"
 #include "test.h"
 
-#define MAX_THREADS 10 // maximum number of threads
+#define MAX_THREADS 10    // maximum number of threads
+#define MAX_BCOUNT 100000 // maximum number of threads
 
 // global variables
 int N;
@@ -51,6 +52,7 @@ pthread_cond_t t_cond_wait = PTHREAD_COND_INITIALIZER;
 
 // for keeping statistics
 int threadTotalWaitingTime[MAX_THREADS];
+int burstTotalWaitingTime[MAX_BCOUNT];
 
 // generates random exponential number from mean
 double generateRandomExpNum(int mean)
@@ -178,6 +180,10 @@ int main(int argc, char *argv[])
     {
         threadTotalWaitingTime[i] = 0;
     }
+    for (int i = 0; i < Bcount; i++)
+    {
+        burstTotalWaitingTime[i] = 0;
+    }
 
     // create the readyqueue
     rq = initReadyQueue();
@@ -249,9 +255,9 @@ int main(int argc, char *argv[])
         {
             gettimeofday(&exeTime, NULL);
         }
-
         int threadWaitingTime = ((exeTime.tv_sec - node->time.tv_sec) * 1000000 + (exeTime.tv_usec - node->time.tv_usec)) / 1000;
         threadTotalWaitingTime[node->thread_id - 1] += threadWaitingTime;
+        burstTotalWaitingTime[node->burst_id - 1] += threadWaitingTime;
 
         // collect statistics
         usleep(node->length * 1000); // sleep till burst time
@@ -259,19 +265,25 @@ int main(int argc, char *argv[])
         free(node);
     }
 
-    printf("main: waiting all threads to terminate\n");
+    printf("Waiting threads to terminate...\n");
     for (int i = 0; i < N; i++)
     {
         ret = pthread_join(t_args[i].tid, NULL);
-        printf("\tTotal waiting time: %d ms.\n", threadTotalWaitingTime[i]);
+        //  report the statistics
+        printf("\tTotal waiting time in thread %d: %d ms.\n", (i + 1), threadTotalWaitingTime[i]);
         if (ret != 0)
         {
             printf("thread join failed \n");
             exit(0);
         }
     }
-
     printf("main: all threads terminated\n");
+    for (int i = 0; i < Bcount; i++)
+    {
+        printf("\tTotal waiting time of burst %d: %d ms.\n", (i + 1), burstTotalWaitingTime[i]);
+    }
+
+    // deallocate the ready queue
     deleteReadyqueue(rq->head);
     free(rq);
 
