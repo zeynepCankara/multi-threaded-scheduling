@@ -210,9 +210,11 @@ int main(int argc, char *argv[])
 
     // server thread logic
     int count = N;
-    struct timeval startTime;
-    struct timeval exeTime;
-    int timeFlag = 1;
+    // time the burst start execution
+    struct timeval timeStart;
+    // time the burst exec finished
+    struct timeval timeFinish;
+    int burstProcessed = 0;
     while (count > 0)
     {
         // select node based on the ALG
@@ -245,17 +247,17 @@ int main(int argc, char *argv[])
         printf("(server) burst time: %d, t_id: %d, b_index, %d \n", node->length, node->thread_id, node->burst_id);
 
         // collect statistics
-        if (timeFlag > 0)
+        if (burstProcessed != 1)
         {
-            gettimeofday(&startTime, NULL);
-            exeTime = startTime;
-            timeFlag = 0;
+            gettimeofday(&timeStart, NULL);
+            timeFinish = timeStart;
+            burstProcessed = 1;
         }
         else
         {
-            gettimeofday(&exeTime, NULL);
+            gettimeofday(&timeFinish, NULL);
         }
-        int threadWaitingTime = ((exeTime.tv_sec - node->time.tv_sec) * 1000000 + (exeTime.tv_usec - node->time.tv_usec)) / 1000;
+        int threadWaitingTime = ((timeFinish.tv_sec - node->time.tv_sec) * 1000000 + (timeFinish.tv_usec - node->time.tv_usec)) / 1000;
         threadTotalWaitingTime[node->thread_id - 1] += threadWaitingTime;
         burstTotalWaitingTime[node->burst_id - 1] += threadWaitingTime;
 
