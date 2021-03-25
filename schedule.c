@@ -60,6 +60,8 @@ int burstTotalWaitingTime[MAX_BCOUNT];
 FILE *readFromThread[MAX_THREADS];
 char *readFromLine[MAX_THREADS] = {NULL};
 size_t readFromLen[MAX_THREADS] = {0};
+int BcountThread[MAX_THREADS] = {0};
+char *readFromFile[MAX_THREADS] = {NULL};
 
 // generates random exponential number from mean
 double generateRandomExpNum(int mean)
@@ -169,6 +171,40 @@ static void *do_task(void *arg_ptr)
     pthread_exit(0);
 }
 
+void getFilename(char name[], int t_id)
+{
+    strcpy(name, inprefix);
+    strcat(name, "-");
+    char N_str[100];
+    sprintf(N_str, "%d", t_id);
+    strcat(name, N_str);
+    strcat(name, ".txt");
+}
+
+int getThreadBurstCount(int t_id)
+{
+    int currentBCount = 0;
+    FILE *fp;
+    char *line = NULL;
+    size_t len = 0;
+    ssize_t read;
+    char threadInprefix[100];
+    getFilename(threadInprefix, t_id);
+    fp = fopen(threadInprefix, "r");
+    if (fp == NULL)
+        exit(EXIT_FAILURE);
+    printf("filename: %s\n", threadInprefix);
+    while ((read = getline(&line, &len, fp)) != -1)
+    {
+        currentBCount += 1;
+    }
+    printf("nof burst in thread %d: %d\n", t_id, currentBCount);
+    fclose(fp);
+    if (line)
+        free(line);
+    return currentBCount;
+}
+
 // Main Program
 int main(int argc, char *argv[])
 {
@@ -211,41 +247,23 @@ int main(int argc, char *argv[])
     {
         // read the contents of the input files
         FILE *fp;
-        char *line = NULL;
-        size_t len = 0;
-        ssize_t read;
-
         for (int i = 1; i <= N; i++)
         {
             char threadInprefix[100];
-            strcpy(threadInprefix, inprefix);
-            strcat(threadInprefix, "-");
-            char N_str[100];
-            sprintf(N_str, "%d", N);
-            strcat(threadInprefix, N_str);
-            strcat(threadInprefix, ".txt");
-            fp = fopen(threadInprefix, "r");
+            getFilename(threadInprefix, i);
+            printf("filename: %s\n", threadInprefix);
+            readFromFile[i - 1] = threadInprefix;
+            fp = fopen(readFromFile[i - 1], "r");
             if (fp == NULL)
                 exit(EXIT_FAILURE);
             printf("attaching file to thread: %d\n", i);
             readFromThread[i - 1] = fp;
+            fclose(fp);
         }
-
-        fp = fopen("./afile-1.txt", "r");
-        if (fp == NULL)
-            exit(EXIT_FAILURE);
-        Bcount = 0;
-        while ((read = getline(&line, &len, fp)) != -1)
+        for (int i = 0; i < N; i++)
         {
-            Bcount += 2;
-            printf("Retrieved line of length %zu:\n", read);
-            printf("%s", line);
+            BcountThread[i] = getThreadBurstCount(i + 1);
         }
-
-        fclose(fp);
-        if (line)
-            free(line);
-        //exit(EXIT_SUCCESS);
     }
 
     // initialise statistics variables
