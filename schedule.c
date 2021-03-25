@@ -63,6 +63,16 @@ size_t readFromLen[MAX_THREADS] = {0};
 int BcountThread[MAX_THREADS] = {0};
 char *readFromFile[MAX_THREADS] = {NULL};
 
+void getFilename(char name[], int t_id)
+{
+    strcpy(name, inprefix);
+    strcat(name, "-");
+    char N_str[100];
+    sprintf(N_str, "%d", t_id);
+    strcat(name, N_str);
+    strcat(name, ".txt");
+}
+
 // generates random exponential number from mean
 double generateRandomExpNum(int mean)
 {
@@ -108,26 +118,36 @@ int getInterarrivalLength()
 
 void getTimeFromFile(int t_id, char *timeBuffer[])
 {
-    // returns both burst time and sleep time
-    //int length = 0;
-    FILE *fp = readFromThread[t_id - 1];
-    ssize_t isLine;
-    if ((isLine = getline(&readFromLine[t_id - 1], &readFromLen[t_id - 1], fp)) != -1)
+    FILE *fp;
+    char *line = NULL;
+    ssize_t read;
+    char threadInprefix[100];
+    getFilename(threadInprefix, t_id);
+    fp = fopen(threadInprefix, "r");
+    if (fp == NULL)
+        exit(EXIT_FAILURE);
+    printf("filename: %s\n", threadInprefix);
+    if ((read = getline(&line, &readFromLen[t_id - 1], fp)) != -1)
     {
         char buf[LINE_LEN];
-        sprintf(buf, "%zu", isLine);
+        sprintf(buf, "%zu", read);
         int i = 0;
         char *p = strtok(buf, " ");
-        //char *timeBuffer[2]; // interarrival burst
         while (p != NULL)
         {
             timeBuffer[i++] = p;
-            p = strtok(NULL, "/");
         }
 
         for (i = 0; i < 2; ++i)
+        {
             printf("%s\n", timeBuffer[i]);
+        }
+        readFromLen[t_id]++;
     }
+    printf("cant open");
+    fclose(fp);
+    if (line)
+        free(line);
 }
 
 static void *do_task(void *arg_ptr)
@@ -135,10 +155,10 @@ static void *do_task(void *arg_ptr)
     int t_id = ((struct argvThread *)arg_ptr)->t_index;
     pthread_mutex_t t_mutex = PTHREAD_MUTEX_INITIALIZER;
     printf("thread %d started\n", t_id);
-
+    int threadBcount = BcountThread[t_id - 1];
     // perform task...
     int b_index = 1;
-    while (b_index <= Bcount)
+    while (b_index <= threadBcount)
     {
         // Get Burst Duration
         int burstTime;
@@ -166,19 +186,9 @@ static void *do_task(void *arg_ptr)
         usleep(sleepTime * 1000);                            // in ms
         b_index++;
     }
-    pushBurst(rq, t_id, Bcount, -1);
+    pushBurst(rq, t_id, threadBcount, -1);
     pthread_cond_signal(&t_cond_wait);
     pthread_exit(0);
-}
-
-void getFilename(char name[], int t_id)
-{
-    strcpy(name, inprefix);
-    strcat(name, "-");
-    char N_str[100];
-    sprintf(N_str, "%d", t_id);
-    strcat(name, N_str);
-    strcat(name, ".txt");
 }
 
 int getThreadBurstCount(int t_id)
@@ -263,6 +273,13 @@ int main(int argc, char *argv[])
         for (int i = 0; i < N; i++)
         {
             BcountThread[i] = getThreadBurstCount(i + 1);
+        }
+    }
+    else
+    {
+        for (int i = 0; i < N; i++)
+        {
+            BcountThread[i] = Bcount;
         }
     }
 
