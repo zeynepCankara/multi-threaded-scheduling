@@ -49,6 +49,12 @@ typedef struct argvThread
     pthread_cond_t t_cond; // condition variable
 } argvThread;
 
+typedef struct argvBurst
+{
+    int sleepTime;
+    int burstTime;
+} argvBurst;
+
 struct argvThread t_args[MAX_THREADS]; // pass the thread arguments
 pthread_cond_t t_cond_wait = PTHREAD_COND_INITIALIZER;
 
@@ -116,7 +122,7 @@ int getInterarrivalLength()
     return length;
 }
 
-void getTimeFromFile(int t_id, char *timeBuffer[])
+void getTimeFromFile(int t_id, struct argvBurst *burstArg)
 {
     FILE *fp;
     char *line = NULL;
@@ -127,24 +133,30 @@ void getTimeFromFile(int t_id, char *timeBuffer[])
     if (fp == NULL)
         exit(EXIT_FAILURE);
     printf("filename: %s\n", threadInprefix);
+    int bufferIdx = 0;
     if ((read = getline(&line, &readFromLen[t_id - 1], fp)) != -1)
     {
-        char buf[LINE_LEN];
-        sprintf(buf, "%zu", read);
-        int i = 0;
-        char *p = strtok(buf, " ");
-        while (p != NULL)
+        char *token = strtok(line, " ");
+        // loop through the string to extract all other tokens
+        while (bufferIdx != 2)
         {
-            timeBuffer[i++] = p;
+            if (bufferIdx == 0)
+            {
+                burstArg->sleepTime = atoi(token);
+            }
+            else
+            {
+                burstArg->burstTime = atoi(token);
+            }
+            bufferIdx++;
+            token = strtok(NULL, " ");
         }
-
-        for (i = 0; i < 2; ++i)
-        {
-            printf("%s\n", timeBuffer[i]);
-        }
-        readFromLen[t_id]++;
+        readFromLen[t_id - 1]++;
     }
-    printf("cant open");
+    else
+    {
+        printf("cant open");
+    }
     fclose(fp);
     if (line)
         free(line);
@@ -171,10 +183,11 @@ static void *do_task(void *arg_ptr)
         }
         else
         {
-            char *timeBuffer[2];
+            struct argvBurst *timeBuffer = malloc(sizeof(struct argvBurst));
             getTimeFromFile(t_id, timeBuffer);
-            burstTime = atoi(timeBuffer[0]);
-            sleepTime = atoi(timeBuffer[1]);
+            burstTime = timeBuffer->burstTime;
+            sleepTime = timeBuffer->sleepTime;
+            free(timeBuffer);
             printf(" (do_task)-burstTime: %d\n", burstTime);
             printf(" (do_task)-sleepTime: %d\n", sleepTime);
         }
