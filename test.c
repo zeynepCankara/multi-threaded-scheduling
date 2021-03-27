@@ -1,6 +1,10 @@
-#include "test.h"
+/**
+ * Test functions for the scheduling algorithms
+ * @author Zeynep Cankara - 21703381
+ * @version 1.0
+ */
 
-// Test funtions
+#include "test.h"
 
 void fcfsTest(struct readyqueue *rq)
 {

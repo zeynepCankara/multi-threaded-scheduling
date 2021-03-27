@@ -1,7 +1,7 @@
 /**
  * A multi-threaded scheduling simulator.
- * Runs N threads concurrently  and generating cpu  bursts  (workload).
- * A server threads handles the scheduling and execution of the bursts.
+ * N Workload (W) threads runs concurrently, generating cpu bursts from file or from exponential distribution.
+ * A server threads handles the scheduling and execution of the bursts waiting in the ready queue.
  * @author Zeynep Cankara - 21703381
  * @version 1.0
  **/
@@ -19,9 +19,10 @@
 #include "readyqueue.h"
 #include "test.h"
 
-#define MAX_THREADS 10   // maximum number of threads
+#define MAX_THREADS 20   // maximum number of threads
 #define MAX_BCOUNT 10000 // maximum number of threads
 #define LINE_LEN 10000   // length of a line
+#define GET_LOG 0        // print state of workload and server thread
 
 // global variables
 int N;
@@ -63,7 +64,6 @@ int threadTotalWaitingTime[MAX_THREADS];
 int burstTotalWaitingTime[MAX_BCOUNT];
 
 // keep track of the reading from the file and thread
-FILE *readFromThread[MAX_THREADS];
 char *readFromLine[MAX_THREADS] = {NULL};
 size_t readFromLen[MAX_THREADS] = {0};
 int BcountThread[MAX_THREADS] = {0};
@@ -132,7 +132,6 @@ void getTimeFromFile(int t_id, struct argvBurst *burstArg)
     fp = fopen(threadInprefix, "r");
     if (fp == NULL)
         exit(EXIT_FAILURE);
-    printf("filename: %s\n", threadInprefix);
     int bufferIdx = 0;
     if ((read = getline(&line, &readFromLen[t_id - 1], fp)) != -1)
     {
@@ -155,7 +154,7 @@ void getTimeFromFile(int t_id, struct argvBurst *burstArg)
     }
     else
     {
-        printf("cant open");
+        printf("ERROR: cant open the file!");
     }
     fclose(fp);
     if (line)
@@ -166,37 +165,38 @@ static void *do_task(void *arg_ptr)
 {
     int t_id = ((struct argvThread *)arg_ptr)->t_index;
     pthread_mutex_t t_mutex = PTHREAD_MUTEX_INITIALIZER;
-    printf("thread %d started\n", t_id);
+    printf("(Start) thread %d\n", t_id);
     int threadBcount = BcountThread[t_id - 1];
     // perform task...
     int b_index = 1;
     while (b_index <= threadBcount)
     {
-        // Get Burst Duration
         int burstTime;
-        // Get Sleep Duration
         int sleepTime;
         if (isFromFile == 0)
         {
+            // generate randomly from exponential dist
             burstTime = getBurstLength();
             sleepTime = getInterarrivalLength();
         }
         else
         {
+            // get from the input file
             struct argvBurst *timeBuffer = malloc(sizeof(struct argvBurst));
             getTimeFromFile(t_id, timeBuffer);
             burstTime = timeBuffer->burstTime;
             sleepTime = timeBuffer->sleepTime;
             free(timeBuffer);
-            printf(" (do_task)-burstTime: %d\n", burstTime);
-            printf(" (do_task)-sleepTime: %d\n", sleepTime);
         }
-        printf(" (do_task)-burstTime: %d, t_id: %d, b_index, %d \n", burstTime, t_id, b_index);
+        if (GET_LOG == 1)
+        {
+            printf(" (workload): {t_id: %d, b_index: %d, length: %d}\n", t_id, b_index, burstTime);
+        }
         // Send burst duration to queue
         pushBurst(rq, t_id, b_index, burstTime);
         pthread_cond_signal(&t_cond_wait);
-        pthread_cond_wait(&(t_args[t_id].t_cond), &t_mutex); // wait cond mutex
-        usleep(sleepTime * 1000);                            // in ms
+        pthread_cond_wait(&(t_args[t_id - 1].t_cond), &t_mutex); // wait cond mutex
+        usleep(sleepTime * 1000);                                // in ms
         b_index++;
     }
     pushBurst(rq, t_id, threadBcount, -1);
@@ -216,12 +216,10 @@ int getThreadBurstCount(int t_id)
     fp = fopen(threadInprefix, "r");
     if (fp == NULL)
         exit(EXIT_FAILURE);
-    printf("filename: %s\n", threadInprefix);
     while ((read = getline(&line, &len, fp)) != -1)
     {
         currentBCount += 1;
     }
-    printf("nof burst in thread %d: %d\n", t_id, currentBCount);
     fclose(fp);
     if (line)
         free(line);
@@ -231,6 +229,10 @@ int getThreadBurstCount(int t_id)
 // Main Program
 int main(int argc, char *argv[])
 {
+    // time elapsed for the program execution
+    struct timeval tv1, tv2;
+    gettimeofday(&tv1, NULL);
+
     isFromFile = 0;
     if (argc == 8)
     {
@@ -269,19 +271,11 @@ int main(int argc, char *argv[])
     if (isFromFile)
     {
         // read the contents of the input files
-        FILE *fp;
         for (int i = 1; i <= N; i++)
         {
             char threadInprefix[100];
             getFilename(threadInprefix, i);
-            printf("filename: %s\n", threadInprefix);
             readFromFile[i - 1] = threadInprefix;
-            fp = fopen(readFromFile[i - 1], "r");
-            if (fp == NULL)
-                exit(EXIT_FAILURE);
-            printf("attaching file to thread: %d\n", i);
-            readFromThread[i - 1] = fp;
-            fclose(fp);
         }
         for (int i = 0; i < N; i++)
         {
@@ -308,9 +302,9 @@ int main(int argc, char *argv[])
 
     // create the readyqueue
     rq = initReadyQueue();
+    printf("(CREATED)-{Ready queue}\n");
 
     int ret;
-
     for (int i = 0; i < N; ++i)
     {
         t_args[i].t_index = i + 1;
@@ -322,10 +316,10 @@ int main(int argc, char *argv[])
 
         if (ret != 0)
         {
-            printf("ERROR: thread create failed \n");
+            printf("ERROR: thread create failed!\n");
             exit(1);
         }
-        printf("thread %i with tid %u created\n", i,
+        printf("(CREATE)-{thread %i, tid %u}\n", i + 1,
                (unsigned int)t_args[i].tid);
     }
 
@@ -364,10 +358,12 @@ int main(int argc, char *argv[])
             free(node);
             continue;
         }
-        // node info
-        printf("(server) burst time: %d, t_id: %d, b_index, %d \n", node->length, node->thread_id, node->burst_id);
+        if (GET_LOG == 1)
+        {
+            printf("(server)-{t_id: %d, b_index, %d, length: %d}\n", node->thread_id, node->burst_id, node->length);
+        }
 
-        // collect statistics
+        // collect stats
         if (burstProcessed != 1)
         {
             gettimeofday(&timeStart, NULL);
@@ -384,29 +380,33 @@ int main(int argc, char *argv[])
 
         // collect statistics
         usleep(node->length * 1000); // sleep till burst time
-        pthread_cond_signal(&(t_args[node->thread_id].t_cond));
+        pthread_cond_signal(&(t_args[node->thread_id - 1].t_cond));
         free(node);
     }
 
-    printf("Waiting threads to terminate...\n");
+    printf("(TERMINATE) all threads!\n");
     for (int i = 0; i < N; i++)
     {
         ret = pthread_join(t_args[i].tid, NULL);
         //  report the statistics
-        printf("\tTotal waiting time in thread %d: %d ms.\n", (i + 1), threadTotalWaitingTime[i]);
+        printf("\t(TOTAL WAITING TIME)-{thread %d: %d ms}\n", (i + 1), threadTotalWaitingTime[i]);
         if (ret != 0)
         {
-            printf("thread join failed \n");
+            printf("ERROR: thread join failed!\n");
             exit(0);
         }
     }
     int totalBurstWaiting = 0;
-    printf("main: all threads terminated\n");
+    printf("(SUCCESS) all threads terminated\n");
     for (int i = 0; i < Bcount; i++)
     {
         totalBurstWaiting += burstTotalWaitingTime[i];
     }
     printf("\tTotal burst waiting time %d ms.\n", totalBurstWaiting);
+    gettimeofday(&tv2, NULL);
+    printf("Total time elapsed: %f s\n",
+           (double)(tv2.tv_usec - tv1.tv_usec) / 1000000 +
+               (double)(tv2.tv_sec - tv1.tv_sec));
 
     // deallocate the ready queue
     deleteReadyqueue(rq->head);

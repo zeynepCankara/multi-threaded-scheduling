@@ -1,6 +1,7 @@
 /**
  * Ready queue to select CPU bursts based on the selected algorithm.
  * Internally implements a linkedlist to execute readyqueue operations
+ * Implements nonpreemptive scheduling algorithms FCFS, SJF, PRIO, VRUNTIME
  * @author Zeynep Cankara - 21703381
  * @version 1.0
  */
