@@ -402,7 +402,7 @@ int main(int argc, char *argv[])
     {
         totalBurstWaiting += burstTotalWaitingTime[i];
     }
-    printf("\tTotal burst waiting time %d ms.\n", totalBurstWaiting);
+    printf("\t Average thread waiting time %f ms.\n", (float)(totalBurstWaiting / N));
     gettimeofday(&tv2, NULL);
     printf("Total time elapsed: %f s\n",
            (double)(tv2.tv_usec - tv1.tv_usec) / 1000000 +
