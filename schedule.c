@@ -400,11 +400,13 @@ int main(int argc, char *argv[])
             exit(0);
         }
     }
+    int totalBurstWaiting = 0;
     printf("main: all threads terminated\n");
     for (int i = 0; i < Bcount; i++)
     {
-        printf("\tTotal waiting time of burst %d: %d ms.\n", (i + 1), burstTotalWaitingTime[i]);
+        totalBurstWaiting += burstTotalWaitingTime[i];
     }
+    printf("\tTotal burst waiting time %d ms.\n", totalBurstWaiting);
 
     // deallocate the ready queue
     deleteReadyqueue(rq->head);
