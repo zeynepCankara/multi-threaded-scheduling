@@ -22,7 +22,7 @@
 #define MAX_THREADS 20   // maximum number of threads
 #define MAX_BCOUNT 10000 // maximum number of threads
 #define LINE_LEN 10000   // length of a line
-#define GET_LOG 0        // print state of workload and server thread
+#define GET_LOG 1        // print state of workload and server thread
 
 // global variables
 int N;
@@ -188,6 +188,7 @@ static void *do_task(void *arg_ptr)
             sleepTime = timeBuffer->sleepTime;
             free(timeBuffer);
         }
+        usleep(sleepTime * 1000); // in ms
         if (GET_LOG == 1)
         {
             printf(" (workload): {t_id: %d, b_index: %d, length: %d}\n", t_id, b_index, burstTime);
@@ -196,7 +197,7 @@ static void *do_task(void *arg_ptr)
         pushBurst(rq, t_id, b_index, burstTime);
         pthread_cond_signal(&t_cond_wait);
         pthread_cond_wait(&(t_args[t_id - 1].t_cond), &t_mutex); // wait cond mutex
-        usleep(sleepTime * 1000);                                // in ms
+
         b_index++;
     }
     pushBurst(rq, t_id, threadBcount, -1);
@@ -377,7 +378,6 @@ int main(int argc, char *argv[])
         int threadWaitingTime = ((timeFinish.tv_sec - node->time.tv_sec) * 1000000 + (timeFinish.tv_usec - node->time.tv_usec)) / 1000;
         threadTotalWaitingTime[node->thread_id - 1] += threadWaitingTime;
         burstTotalWaitingTime[node->burst_id - 1] += threadWaitingTime;
-
         // collect statistics
         usleep(node->length * 1000); // sleep till burst time
         pthread_cond_signal(&(t_args[node->thread_id - 1].t_cond));
@@ -398,11 +398,16 @@ int main(int argc, char *argv[])
     }
     int totalBurstWaiting = 0;
     printf("(SUCCESS) all threads terminated\n");
-    for (int i = 0; i < Bcount; i++)
+    // report stats
+    float accWaitingTimeThread = 0.0;
+    float currentAvgWaitingTime = 0.0;
+    for (int i = 0; i < N; i++)
     {
-        totalBurstWaiting += burstTotalWaitingTime[i];
+        currentAvgWaitingTime = (threadTotalWaitingTime[i] / BcountThread[i]);
+        accWaitingTimeThread += currentAvgWaitingTime;
+        printf("\t Average thread waiting time for thread %d:  %f ms.\n", (i + 1), (float)currentAvgWaitingTime);
     }
-    printf("\t Average thread waiting time %f ms.\n", (float)(totalBurstWaiting / N));
+    printf("\t Accumulated average waiting time:  %f ms.\n", (float)(accWaitingTimeThread / N));
     gettimeofday(&tv2, NULL);
     printf("Total time elapsed: %f s\n",
            (double)(tv2.tv_usec - tv1.tv_usec) / 1000000 +
