@@ -396,7 +396,6 @@ int main(int argc, char *argv[])
             exit(0);
         }
     }
-    int totalBurstWaiting = 0;
     printf("(SUCCESS) all threads terminated\n");
     // report stats
     float accWaitingTimeThread = 0.0;
